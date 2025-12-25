@@ -1,33 +1,8 @@
-name: Simple Music Server
-
-on: [workflow_dispatch]
-
-jobs:
-  run-server:
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        
-    - run: npm install
-    
-    - name: Modify start.bat для GitHub Actions
-      run: |
-        # Убираем pause для автоматического выполнения
-        (Get-Content start.bat) -replace 'pause', 'echo Script completed' | Set-Content start.bat
-        Get-Content start.bat
-      shell: pwsh
-      
-    - name: Execute
-      run: cmd /c start.bat
-      
-    - name: Check if server is running
-      run: |
-        timeout /t 5
-        tasklist /fi "imagename eq node.exe"
-      shell: cmd
+- name: Setup and run
+  run: |
+    # Установка Яндекс.Музыка (если требуется)
+    # Запуск с параметрами отладки
+    Start-Process -FilePath "yandexmusic.exe" -ArgumentList "--remote-debugging-port=9222"
+    Start-Sleep -Seconds 10
+    node setup.js
+  shell: pwsh
