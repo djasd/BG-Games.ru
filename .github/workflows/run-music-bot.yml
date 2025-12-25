@@ -1,38 +1,59 @@
-name: Temp Public Server
+name: Yandex Music with Debug
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '10'
 
 jobs:
-  public-access:
+  yandex-music-debug:
     runs-on: windows-latest
+    timeout-minutes: ${{ github.event.inputs.duration || 10 }}
     
     steps:
     - uses: actions/checkout@v4
-      
-    - name: Install serve
-      run: npm install -g serve
-      
-    - name: Start multiple servers
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Check ports before start
       run: |
-        # Запускаем основной сервер на 3002
+        netstat -ano | findstr :9222 && echo "⚠️ Port 9222 is in use!" || echo "✅ Port 9222 is free"
+        netstat -ano | findstr :3002 && echo "⚠️ Port 3002 is in use!" || echo "✅ Port 3002 is free"
+      shell: cmd
+      
+    - name: Start server with environment variables
+      env:
+        YANDEX_MUSIC_PORT: 9222
+        SERVER_PORT: 3002
+        NODE_ENV: production
+      run: |
+        echo "Configuration:"
+        echo "Yandex Music Debug Port: %YANDEX_MUSIC_PORT%"
+        echo "Server Port: %SERVER_PORT%"
+        
+        echo "📡 Starting servers..."
+        
+        # Запускаем в фоновом режиме и сохраняем PID
         start /B cmd /c "node setup.js"
+        timeout /t 5
         
-        # Создаем простую HTML страницу для мониторинга
-        echo "<html><body><h1>Yandex Music Server</h1><p>HTTP: <a href='http://localhost:3002'>localhost:3002</a></p><p>WebSocket: ws://localhost:3002</p></body></html>" > status.html
-        
-        # Запускаем веб-сервер для статуса на 8080
-        serve -p 8080 . &
-        
-        echo "📊 Статус страница: http://localhost:8080/status.html"
-        
-    - name: Expose with localtunnel
+        # Проверяем, что процессы запустились
+        tasklist | findstr node
+        netstat -ano | findstr :3002 && echo "✅ Server is running" || echo "❌ Server failed to start"
+      shell: cmd
+      
+    - name: Keep alive for testing
+      if: github.event_name == 'workflow_dispatch'
       run: |
-        npm install -g localtunnel
-        # Открываем туннель для порта 3002
-        npx lt --port 3002 --subdomain yandex-music-$(date +%s) &
-        # И для порта 8080
-        npx lt --port 8080 &
-        
-        # Ждем и показываем ссылки
-        timeout /t 15
-        echo "Проверьте ссылки выше в логах lt"
+        echo "⏰ Running for ${{ github.event.inputs.duration || 10 }} minutes..."
+        timeout /t ${{ github.event.inputs.duration || 600 }}
+      shell: cmd
